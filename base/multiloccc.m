@@ -1,0 +1,183 @@
+% ------------------------------------------------------------------------------ 
+% Article:     Functional Principal Component Analysis for Derivatives of 
+%              High-Dimensional Spatial Curves
+% ------------------------------------------------------------------------------ 
+% Description: 2 Dimensional local polynomial estimator 
+%
+% ------------------------------------------------------------------------------ 
+% Usage:       - 
+% ------------------------------------------------------------------------------ 
+% Inputs Simulation:      
+%X1 - x1 coordinate, 
+%X2 - x2 coordinate,  
+%Y  - function value
+%x1 - x1 output coordinate
+%x2 - x2 output coordinate 
+%h1 - bandwith in x1 direction
+%h2 - bandwith in x2 direction
+%p  - degree of polynomial
+ 
+% ------------------------------------------------------------------------------ 
+% Output:      
+%fit0  - Smoothed curves
+%fit1  - Smoothed 1. derivative
+%fit2  - Smoothed 2. derivative
+%fit3  - Smoothed 3. derivative
+%h1    - bandwith in x1 direction
+%h2    - bandwith in x2 direction
+
+% ------------------------------------------------------------------------------ 
+% Keywords:    local polynomial surface estimator, derivatives
+% ------------------------------------------------------------------------------ 
+% See also:    -  
+% ------------------------------------------------------------------------------ 
+% Author:      Heiko Wagner, 2015/05/28 
+% ------------------------------------------------------------------------------ 
+
+
+function [fit0, fit1, fit2,fit3,W0, W1, W2, W3, h1,h2] = multiloc( X1, X2,  Y, x1,x2, h1i,h2i,pn,kerneli);
+clear  X1g X2g p h1 h2 kernel T Yg
+
+
+% i=1
+% X1=cell2mat(  c5unil(i) )
+% X2= cell2mat(  c2unil(i) ) 
+% Y=cell2mat(  c3unil(i) )
+% x1=my
+% x2=mx
+% h1=0.4%%%Mat (sparse axis)
+% h2=0.1 %%%Mon
+% p=3
+%kernel ='Gauss'
+
+%global r ;
+%global tauj;
+%global X1g;
+%global X2g;
+
+%X1g=gpuArray(X1);
+%X2g=gpuArray(X2);
+X1g=X1;
+X2g=X2;
+
+
+
+%global Yg; 
+%Yg = gpuArray(Y);
+Yg = Y;
+%global h1; 
+%global h2; 
+%global p;
+p=pn;
+h1=h1i;
+h2=h2i;
+
+%global kernel;
+kernel=kerneli;
+global T;
+T=length(X2);
+N1 = length( X1g );
+CnstTerm = ones( N1, 1 );
+% global r ;
+% global tauj;
+
+
+%N2 = length( X2 ); Na = length( x1 );Nb = length( x2 );   
+% fit0 = zeros( Na ,1); fit1 = zeros( Na,1 );  fit2 = zeros( Na,1 ); fit3 = zeros( Na,1 ); 
+% W0 = zeros( Na ,1); W1 = zeros( Na,1 );  W2 = zeros( Na,1 ); W3 = zeros( Na,1 ); 
+ 
+ 
+ 
+ %[fit0, fit1, fit2,fit3,W0, W1, W2, W3] = multiloc_helper(x1(1),x2(1));
+%function [fit0, fit1, fit2,fit3,W0, W1, W2, W3,x1,x2] = multiloc_nst(x1,x2)
+function [fit0, fit1, fit2,fit3,W0, W1, W2, W3] = multiloc_nst(x1,x2)
+
+ % Xmx1 = gpuArray(X1g - x1);
+ % Xmx2 = gpuArray(X2g - x2);
+
+  Xmx1 = (X1g - x1);
+ Xmx2 = (X2g - x2);
+
+ % [X1t,X2t]=meshgrid( Xmx1, Xmx2);
+Xn = [Xmx1(:) Xmx2(:)];
+
+ %Z = [ CnstTerm, Xn, Xn.^2, Xn.^3  , Xn.^4 , Xn.^5 ]; %Xn1 Xn2 crosserivative
+
+  Z = [CnstTerm];
+ for m=1:p
+ Z = [ Z ,Xn.^m  ];
+ end
+% Z = [ CnstTerm, Xn];
+
+
+
+if(strcmp(kernel,'Gauss')==1)   
+W=diag( normpdf(Xmx1/h1)/h1 .*normpdf(Xmx2/h2)/h2  );
+%'Using Gaussian Kernel'
+else
+W=diag( epan(Xmx1/h1)/h1 .*epan(Xmx2/h2)/h2  );
+end
+%Z=gpuArray(Z);
+%W=gpuArray(W);
+
+A=Z' * W * Z;
+%inv=( A )\speye(size(A));
+
+Ws= pinv(A) * Z' * W;
+b = gather(Ws * Yg);
+Ws=gather(Ws);
+%Ws2=diag(Ws*Ws');
+
+  deriv=0;
+  fit0 = factorial(deriv) * b(deriv+1,1);
+  W0 = factorial(deriv)^2 * sum(Ws(1,:).^2);
+  
+  fit1 =0;
+  W1 = 0;
+  fit2 = 0;
+  W2 = 0;
+  fit3 = 0;
+  W3 = 0;
+
+
+  if(p>1)
+  deriv=1;
+  fit1 = factorial(deriv) * b(3,1); 
+  W1 = factorial(deriv)^2 * sum(Ws(3,:).^2);
+  end
+  if(p>2)
+  deriv=2;
+  fit2 = factorial(deriv) * b(5,1);  
+  W2 = factorial(deriv)^2 * sum(Ws(5,:).^2);
+  deriv=3;
+  fit3 = factorial(deriv) * b(7,1); 
+  W3 = factorial(deriv)^2 * sum(Ws(7,:).^2);
+  end
+end 
+
+%x1=gpuArray(x1);
+%x2=gpuArray(x2);
+
+
+ [fit0, fit1, fit2,fit3,W0, W1, W2, W3]  = arrayfun(@multiloc_nst,x1,x2);
+ % arrayfun(@multiloc_nst,x1,x2);
+
+end
+ 
+
+
+
+% 
+% scatter3(X1,X2,Ws(1,:))
+% 
+% scatter3(my,mx,fit0)
+% hold on
+% scatter3(X1,X2,Y)
+% 
+% scatter(X2,epan(Xmx2/h2))
+% hold on
+% scatter(X1,epan(Xmx1/h1))
+% 
+% 
+% x1(j)
+% x2(j)
