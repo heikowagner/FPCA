@@ -101,7 +101,9 @@ rho=max(sum(derM)+1, ceil(g/2-1+ 3*sum(round((sum(derM)-1)/g))));
 
 %h_ord= 0.5*( (1/(2*(rho+1- sum(derM)) ))+ (1/(g+ sum(derM ) )));
 
-h_ord=-1/(2*(rho+1- sum(derM)) );
+h_ord=-3/(2*(rho+g+1+ sum(derM)) );
+
+%h_ord=-1/(2*(rho+1- sum(derM)) );
 %h_ord=(1/(g+ sum(derM ) ));
 
 
